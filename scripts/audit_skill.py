@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
 """
 Skill Auditor - Security Scanner for Agent Skills
-Version: 0.1.0
+Version: 0.2.0
+
+Changelog:
+- Added base64 payload detection
+- Added subprocess spawning detection  
+- Added obfuscated string detection
+- Added out-of-workspace write detection
 """
 
 import os
 import sys
 import json
 import re
+import base64
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -27,6 +34,49 @@ NETWORK_PATTERNS = [
 FILE_PATTERNS = [
     r"open\s*\(", r"file\.read", r"file\.write", r"fs\.read",
     r"fs\.write", r"shutil\.", r"os\.remove", r"os\.path"
+]
+
+# NEW: Base64 encoding patterns (suggested by @JarvisPeter)
+BASE64_PATTERNS = [
+    r"base64\.b64decode",
+    r"base64\.b64encode",
+    r"atob\s*\(",
+    r"btoa\s*\(",
+    r"Buffer\.from\s*\([^,]+,\s*['\"]base64['\"]",
+]
+
+# NEW: Subprocess spawning patterns (suggested by @JarvisPeter)
+SUBPROCESS_PATTERNS = [
+    r"subprocess\.Popen",
+    r"subprocess\.call",
+    r"subprocess\.run",
+    r"child_process\.spawn",
+    r"child_process\.exec",
+    r"child_process\.fork",
+    r"\bexec\s*\(",
+    r"\bsystem\s*\(",
+    r"os\.system",
+    r"os\.popen",
+]
+
+# NEW: Obfuscation patterns (suggested by @JarvisPeter)
+OBFUSCATION_PATTERNS = [
+    r"\beval\s*\(",
+    r"\bexec\s*\(",
+    r"Function\s*\(",
+    r"__import__\s*\(",
+    r"importlib\.import_module",
+    r"compile\s*\(",
+]
+
+# NEW: Out-of-workspace paths (suggested by @JarvisPeter)
+DANGEROUS_PATHS = [
+    r"~/\.env",
+    r"/etc/",
+    r"/root/",
+    r"\.\./",  # Parent directory
+    r"/proc/",
+    r"/sys/",
 ]
 
 class SecurityReport:
@@ -56,6 +106,14 @@ class SecurityReport:
             "total_risks": len(self.risks),
             "risks": self.risks
         }
+
+def check_base64_in_line(line: str) -> bool:
+    """Check if line contains base64-encoded suspicious content."""
+    # Look for base64 patterns
+    for pattern in BASE64_PATTERNS:
+        if re.search(pattern, line):
+            return True
+    return False
 
 def scan_file(file_path: Path, report: SecurityReport):
     """Scan a single file for security risks."""
@@ -93,6 +151,45 @@ def scan_file(file_path: Path, report: SecurityReport):
                     "FILE_ACCESS",
                     "LOW",
                     f"File system access: {pattern}",
+                    i
+                )
+        
+        # NEW: Check for base64 encoding
+        if check_base64_in_line(line):
+            report.add_risk(
+                "BASE64_PAYLOAD",
+                "MEDIUM",
+                "Potential base64-encoded payload detected",
+                i
+            )
+        
+        # NEW: Check for subprocess spawning
+        for pattern in SUBPROCESS_PATTERNS:
+            if re.search(pattern, line):
+                report.add_risk(
+                    "SUBPROCESS_SPAWN",
+                    "HIGH",
+                    f"Subprocess spawning detected: {pattern}",
+                    i
+                )
+        
+        # NEW: Check for code obfuscation
+        for pattern in OBFUSCATION_PATTERNS:
+            if re.search(pattern, line):
+                report.add_risk(
+                    "CODE_OBFUSCATION",
+                    "HIGH",
+                    f"Potential code obfuscation: {pattern}",
+                    i
+                )
+        
+        # NEW: Check for dangerous paths
+        for pattern in DANGEROUS_PATHS:
+            if re.search(pattern, line):
+                report.add_risk(
+                    "DANGEROUS_PATH",
+                    "HIGH",
+                    f"Access to sensitive path: {pattern}",
                     i
                 )
 

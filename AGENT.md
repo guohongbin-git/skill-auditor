@@ -2,7 +2,7 @@
 
 @meta
 id: skill-auditor
-version: 0.1.0
+version: 0.2.0
 type: security_tool
 entrypoint: scripts/audit_skill.py
 
@@ -11,6 +11,10 @@ entrypoint: scripts/audit_skill.py
   "static_code_scan",
   "sensitive_keyword_detection",
   "network_call_analysis",
+  "base64_payload_detection",
+  "subprocess_spawning_detection",
+  "code_obfuscation_detection",
+  "dangerous_path_detection",
   "security_report_generation"
 ]
 
